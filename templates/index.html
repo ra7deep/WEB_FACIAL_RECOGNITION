@@ -4,9 +4,215 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Emotion Recognition</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            background: linear-gradient(to bottom, #007bff, #f4f4f9);
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            width: 90%;
+            max-width: 800px;
+            padding: 20px;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+        h1 {
+            color: #444;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        .button-group {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.3s ease, transform 0.2s, box-shadow 0.2s;
+        }
+        button#start-btn {
+            background-color: #007bff;
+            color: #fff;
+        }
+        button#stop-btn {
+            background-color: #dc3545;
+            color: #fff;
+        }
+        img {
+            display: none;
+            margin: 20px auto;
+            width: 100%;
+            max-width: 640px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        #brightness-control,
+        #emotion-feedback,
+        #emoji,
+        #emotion-history {
+            display: none; /* Initially hidden */
+        }
+        #brightness-control {
+            margin-top: 20px;
+        }
+        #brightness-control label {
+            display: block;
+            font-size: 1rem;
+            margin-bottom: 10px;
+        }
+        #brightness-control input[type="range"] {
+            width: 100%;
+            max-width: 300px;
+        }
+        #emotion-feedback {
+            margin-top: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        #emoji {
+            font-size: 3rem;
+            margin-top: 10px;
+        }
+        #emotion-history {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            text-align: left;
+            background: #f4f4f9;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Face Emotion Recognition</h1>
-    <img src="{{ url_for('video_feed') }}" width="640" height="480">
+    <div class="container">
+        <h1>Face Emotion Recognition</h1>
+        <div class="button-group">
+            <button id="start-btn">Start Facial Recognition</button>
+            <button id="stop-btn" disabled>Stop Camera</button>
+        </div>
+        <img id="video-feed" src="" alt="Video Feed">
+        <div id="brightness-control">
+            <label for="brightness-slider">Adjust Brightness</label>
+            <input type="range" id="brightness-slider" min="0.5" max="2" step="0.1" value="1">
+        </div>
+        <div id="emotion-feedback">Detected Emotion: None</div>
+        <div id="emoji"></div>
+        <div id="emotion-history">
+            <h3>Emotion History</h3>
+            <ul id="history-list"></ul>
+        </div>
+    </div>
+    <script>
+        const startButton = document.getElementById('start-btn');
+        const stopButton = document.getElementById('stop-btn');
+        const videoFeed = document.getElementById('video-feed');
+        const brightnessControl = document.getElementById('brightness-control');
+        const feedback = document.getElementById('emotion-feedback');
+        const emoji = document.getElementById('emoji');
+        const historyList = document.getElementById('history-list');
+        const emotionHistory = document.getElementById('emotion-history');
+        const brightnessSlider = document.getElementById('brightness-slider');
+
+        let fetchEmotionInterval;
+
+        // Emotion to Emoji Mapping
+        const emotionToEmoji = {
+            "Happy": "😊",
+            "Angry": "😡",
+            "Sad": "😢",
+            "Neutral": "😐",
+            "Fear": "😨",
+            "Disgust": "🤢",
+            "Surprise": "😲",
+            "None": "❓" // Default for no detected emotion
+        };
+
+        // Show Elements Function
+        function showElements() {
+            brightnessControl.style.display = 'block';
+            feedback.style.display = 'block';
+            emoji.style.display = 'block';
+            emotionHistory.style.display = 'block';
+        }
+
+        // Hide Elements Function
+        function hideElements() {
+            brightnessControl.style.display = 'none';
+            feedback.style.display = 'none';
+            emoji.style.display = 'none';
+            emotionHistory.style.display = 'none';
+        }
+
+        // Start Camera and Fetch Data
+        startButton.addEventListener('click', () => {
+            videoFeed.style.display = 'block';
+            videoFeed.src = '/video_feed'; // Activate video feed
+            startButton.disabled = true;
+            stopButton.disabled = false;
+
+            showElements(); // Show brightness, emotion feedback, and history
+
+            // Fetch Emotion Data
+            fetchEmotionInterval = setInterval(() => {
+                fetch('/latest_emotion')
+                    .then(response => response.json())
+                    .then(data => {
+                        const detectedEmotion = data.emotion || "None";
+                        feedback.innerText = `Detected Emotion: ${detectedEmotion}`;
+                        emoji.innerText = emotionToEmoji[detectedEmotion];
+                    });
+
+                fetch('/emotion_history')
+                    .then(response => response.json())
+                    .then(data => {
+                        historyList.innerHTML = '';
+                        data.forEach(emotion => {
+                            const listItem = document.createElement('li');
+                            listItem.innerText = emotion;
+                            historyList.appendChild(listItem);
+                        });
+                    });
+            }, 2000);
+        });
+
+        // Stop Camera
+        stopButton.addEventListener('click', () => {
+            videoFeed.style.display = 'none';
+            videoFeed.src = ''; // Deactivate video feed
+            startButton.disabled = false;
+            stopButton.disabled = true;
+
+            hideElements(); // Hide brightness, emotion feedback, and history
+
+            clearInterval(fetchEmotionInterval);
+            feedback.innerText = 'Detected Emotion: None';
+            emoji.innerText = emotionToEmoji["None"];
+            historyList.innerHTML = '';
+        });
+
+        // Brightness Control
+        brightnessSlider.addEventListener('input', (event) => {
+            const brightnessValue = event.target.value;
+            videoFeed.style.filter = `brightness(${brightnessValue})`;
+        });
+    </script>
 </body>
 </html>
